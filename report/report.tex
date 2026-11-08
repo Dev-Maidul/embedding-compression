@@ -1,0 +1,183 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+
+\renewcommand{\arraystretch}{0.9}
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{0pt}{1.2ex plus .5ex minus .1ex}{0.6ex plus .1ex}{\normalfont\large\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{0pt}{0.8ex plus .4ex minus .1ex}{0.3ex plus .1ex}{\normalfont\bfseries}}
+\makeatother
+\setlength{\abovecaptionskip}{2pt}
+\setlength{\belowcaptionskip}{2pt}
+\setlength{\textfloatsep}{6pt}
+\setlength{\intextsep}{4pt}
+
+\title{\large How much can image features be compressed?\\
+\normalsize Predicting retrieval loss under random projection from intrinsic dimension}
+\author{\small Md Maidul Islam}
+\date{\small \today}
+
+\begin{document}
+\maketitle
+\vspace{-3ex}
+
+\section*{Question}
+
+Image features are routinely compressed to save memory and speed up
+nearest-neighbour search. This project asks a narrow, measurable version
+of a broader question: when a feature vector is compressed by a random
+projection to $m$ dimensions, how much nearest-neighbour retrieval
+quality is lost, and can that loss be predicted ahead of time from the
+feature's \emph{intrinsic dimension} -- how many real degrees of freedom
+the data varies along, as opposed to how many numbers it happens to be
+stored with? This is a small, exploratory empirical study, not a novel
+method and not a state-of-the-art result.
+
+\section*{Methods}
+
+\subsection*{Part A: image and signal processing from scratch}
+
+Convolution/correlation, Gaussian blur, Sobel gradients, Canny edge
+detection (non-maximum suppression and double-threshold hysteresis),
+histogram equalization, and FFT-domain low/high-pass filtering were all
+implemented in NumPy and validated against OpenCV and the convolution
+theorem. See \texttt{docs/EXPLAINERS.md} for the formulas and
+\texttt{docs/DECISIONS.md} for implementation choices (e.g. that Sobel
+uses correlation, not a flipped kernel, matching \texttt{cv2.Sobel}'s
+measured behaviour).
+
+\subsection*{Part B: features}
+
+Three feature types were extracted for the fixed 10{,}000-image CIFAR-10
+test set (Krizhevsky, 2009): raw pixels (3072-d, globally normalized to
+$[0,1]$), HOG (Dalal \& Triggs, 2005; 324-d), and pretrained ResNet-18
+(He et al., 2016) penultimate-layer features (512-d, 224px input
+resolution, chosen after a speed benchmark -- see Table~\ref{tab:b}).
+
+\subsection*{Part C: random projection and retrieval}
+
+Three random projections were implemented: dense Gaussian, sparse
+Achlioptas (2003), and a structured Subsampled Randomized Hadamard
+Transform (SRHT), all scaled to be norm-preserving in expectation.
+Ground-truth top-10 Euclidean neighbours were computed in each feature's
+original space (10{,}000 queries, leave-query-out); after projection to
+$m \in \{4,8,16,32,64,128,256\}$ dimensions ($m<d$ only), top-10 was
+recomputed and recall@10 measured, averaged over 10 projection seeds with
+a 95\% bootstrap confidence interval (1000 resamples) over the pooled
+(seed, query) recall values.
+
+Intrinsic dimension was estimated with TwoNN (Facco et al., 2017) and the
+Levina \& Bickel (2004) MLE ($k=10$ to $20$, averaged), both validated on
+synthetic data of known dimension before use on real features
+(Table~\ref{tab:c-id}).
+
+\section*{Results}
+
+\subsection*{Part A validation}
+
+\begin{table}[h]
+\centering
+\small
+\input{tables/a_validation.tex}
+\caption{Part A: our NumPy implementations vs.\ OpenCV, max over 4 validation images.}
+\label{tab:a-validation}
+\end{table}
+
+Agreement is at floating-point precision for filtering and Gaussian blur,
+exact for Sobel, and 93--99\% pixel agreement for Canny (a different,
+also-valid NMS/threshold convention than OpenCV's, not a bug; see
+\texttt{docs/DECISIONS.md}). The convolution theorem was confirmed
+numerically (max abs error $\sim 10^{-13}$ between spatial and FFT-domain
+convolution, kernel sizes 3--31).
+
+\subsection*{Part B features}
+
+\begin{table}[h]
+\centering\small
+\input{tables/b_features.tex}
+\hspace{1em}
+\input{tables/b_resnet_benchmark.tex}
+\caption{Left: cached feature shapes/extraction time, all 10{,}000 images. Right: ResNet-18 resolution benchmark (500-image subset, extrapolated) -- motivates using 224px, well under the 20-min budget even at the slowest option.}
+\label{tab:b}
+\end{table}
+
+\subsection*{Part C: intrinsic dimension}
+
+\begin{table}[h]
+\centering\small
+\input{tables/c_id_validation.tex}
+\hspace{1em}
+\input{tables/c_intrinsic_dim_overall.tex}
+\caption{Left: ID estimator validation on synthetic data of known dimension (5-d subspace near-exact; 10-d hypercube underestimated by $\sim$1.5--2, a documented boundary-bias effect, not an error). Right: estimated ID by feature type, full set. Per-class estimates (30 combinations) are in \texttt{results/c\_intrinsic\_dim.csv}.}
+\label{tab:c-id}
+\end{table}
+
+\subsection*{Part C: recall vs.\ projection dimension}
+
+\begin{table}[h]
+\centering\small
+\input{tables/c_recall_at_m64.tex}
+\caption{recall@10 at $m=64$, all (feature, projection) pairs, mean with 95\% bootstrap CI. Full curves: \texttt{results/figures/c\_recall\_vs\_m\_*.png}. All three projections perform similarly for pixels/HOG; for ResNet, SRHT noticeably outperforms Gaussian/sparse at larger $m$ ($\approx$0.69 vs.\ $\approx$0.58 at $m=256$), reported but not fully explained.}
+\label{tab:c-recall-m64}
+\end{table}
+
+\subsection*{Part C: collapse hypothesis}
+
+\begin{table}[h]
+\centering\small
+\input{tables/c_collapse.tex}
+\caption{Collapse-spread statistic by $x$-axis (lower = more collapse), plus Spearman correlation. $m/\hat{ID}$ collapses best, $m/d$ worst -- real, measured support for the hypothesis, but Figure \texttt{c\_collapse\_vs\_m\_over\_id.png} shows curves remain visibly separated: partial, not clean collapse. The $n=3$ Spearman check is reported for completeness, not as evidence.}
+\label{tab:c-collapse}
+\end{table}
+
+\section*{Limitations}
+
+\begin{itemize}
+\setlength{\itemsep}{1pt}
+\setlength{\parsep}{0pt}
+\setlength{\topsep}{2pt}
+\item Single dataset (CIFAR-10), a fixed 10{,}000-image subset, one
+  random seed for data splits.
+\item CPU-only, which bounded some choices (e.g.\ ResNet-18 instead of a
+  larger backbone) but was not otherwise a binding constraint -- every
+  experiment here, including the slowest (18.5 minutes), finished well
+  within the hour.
+\item The collapse analysis uses only feature-type-level recall curves,
+  not separate recall sweeps per class, because the per-class version
+  would have cost roughly 10$\times$ Part C's measured runtime; per-class
+  \emph{intrinsic dimension} estimates were still computed in full
+  (\texttt{results/c\_intrinsic\_dim.csv}).
+\item The hypothesis (recall vs.\ $m/\hat{ID}$ collapses across feature
+  types) is exploratory and received partial, not full, support: a real
+  measured effect, but not a clean collapse. The Spearman correlation
+  check is underpowered ($n=3$).
+\item Canny does not pixel-match OpenCV exactly, by design (a different,
+  also-standard NMS/threshold convention); this is a known, measured,
+  and documented difference, not an unverified assumption.
+\item HOG, ResNet, and the Levina-Bickel/TwoNN citations listed in
+  the project brief should be independently verified by the author before use in
+  any application, per the project's own instructions.
+\end{itemize}
+
+\section*{Reproducibility}
+
+Every number in this report is generated from a CSV in \texttt{results/}
+by \texttt{report/make\_tables.py}; nothing above is typed by hand.
+Seed 42 is used everywhere a seed applies. Machine/package versions are
+recorded in \texttt{results/environment.txt}. To reproduce from a clean
+clone:
+
+\begin{verbatim}
+./run_all.sh
+\end{verbatim}
+
+This recreates the virtual environment, re-downloads CIFAR-10 if needed,
+re-runs every experiment in order, and regenerates every CSV, figure, and
+this report's tables. See \texttt{README.md} for the exact commands to
+run individual stages and \texttt{docs/DECISIONS.md} for every parameter
+choice and the reasoning behind it.
+
+\end{document}

@@ -1,0 +1,19 @@
+Date: 2026-11-08T20:28:40.337515
+Python: 3.13.9 | packaged by Anaconda, Inc. | (main, Oct 21 2025, 19:11:29) [Clang 20.1.8 ]
+Platform: macOS-27.0.1-arm64-arm-64bit-Mach-O
+CPU: Apple M1
+RAM: 16.0 GB
+
+Package versions:
+numpy==2.5.4
+scipy==1.18.1
+scikit-learn==1.9.1
+scikit-image==0.26.0
+opencv-python-headless==5.0.0
+matplotlib==3.11.2
+pandas==3.1.1
+torch==2.15.0
+torchvision==0.29.2
+tqdm==4.70.1
+pytest==9.2.0
+pyyaml==6.0.3

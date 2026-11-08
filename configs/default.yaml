@@ -1,0 +1,33 @@
+# Central place for every number that could otherwise be a "magic constant"
+# hidden inside a script. If you change an experiment, change it here.
+
+seed: 42
+
+paths:
+  data_dir: "data"
+  cifar10_dir: "data/cifar10"
+  features_dir: "data/features"
+  results_dir: "results"
+  docs_dir: "docs"
+
+part_a:
+  # images used to validate our NumPy implementations against OpenCV/skimage
+  n_cifar_images: 20
+  gaussian_sigma: 1.4
+  gaussian_ksize: 5
+  canny_low_threshold: 0.1
+  canny_high_threshold: 0.2
+
+part_b:
+  n_retrieval_images: 10000   # full CIFAR-10 test set
+  hog_orientations: 9
+  hog_pixels_per_cell: [8, 8]
+  hog_cells_per_block: [2, 2]
+  resnet_input_resolution: 224  # chosen after Day 3 timing benchmark; see README/DECISIONS.md
+
+part_c:
+  projection_dims: [4, 8, 16, 32, 64, 128, 256]
+  n_projection_seeds: 10
+  k_neighbours: 10
+  n_bootstrap_resamples: 1000
+  id_mle_k_range: [10, 20]
