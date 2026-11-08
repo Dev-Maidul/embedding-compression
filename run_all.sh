@@ -61,4 +61,4 @@ else
   echo "pdflatex not found -- skipping PDF compile. Install a LaTeX distribution (e.g. 'brew install --cask basictex') to compile report/report.tex yourself."
 fi
 
-echo "Day 1-6 steps complete."
+echo "All steps complete."

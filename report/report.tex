@@ -18,7 +18,7 @@
 \title{\large How much can image features be compressed?\\
 \normalsize Predicting retrieval loss under random projection from intrinsic dimension}
 \author{\small Md Maidul Islam}
-\date{\small \today}
+\date{\small November 2026}
 
 \begin{document}
 \maketitle
@@ -129,7 +129,7 @@ convolution, kernel sizes 3--31).
 \begin{table}[h]
 \centering\small
 \input{tables/c_collapse.tex}
-\caption{Collapse-spread statistic by $x$-axis (lower = more collapse), plus Spearman correlation. $m/\hat{ID}$ collapses best, $m/d$ worst -- real, measured support for the hypothesis, but Figure \texttt{c\_collapse\_vs\_m\_over\_id.png} shows curves remain visibly separated: partial, not clean collapse. The $n=3$ Spearman check is reported for completeness, not as evidence.}
+\caption{Collapse-spread statistic by $x$-axis (lower = more collapse), plus Spearman correlation. $m/\hat{ID}$ gives a slightly lower spread than raw $m$ (0.031 vs.\ 0.043), but the three feature types' TwoNN estimates are themselves fairly close (31.6, 40.0, 30.1), leaving limited room for $m/\hat{ID}$ to differ from $m$; this is weak, preliminary evidence at best, based on only three curves with no uncertainty estimate on the statistic itself. The $n=3$ Spearman check is reported for completeness, not as evidence.}
 \label{tab:c-collapse}
 \end{table}
 
@@ -151,15 +151,14 @@ convolution, kernel sizes 3--31).
   \emph{intrinsic dimension} estimates were still computed in full
   (\texttt{results/c\_intrinsic\_dim.csv}).
 \item The hypothesis (recall vs.\ $m/\hat{ID}$ collapses across feature
-  types) is exploratory and received partial, not full, support: a real
-  measured effect, but not a clean collapse. The Spearman correlation
-  check is underpowered ($n=3$).
+  types) is exploratory and received only weak, preliminary support, not
+  confirmation: the three feature types' intrinsic dimension estimates
+  are themselves fairly close together, leaving limited room for
+  $m/\hat{ID}$ to differ meaningfully from raw $m$. The Spearman
+  correlation check is underpowered ($n=3$).
 \item Canny does not pixel-match OpenCV exactly, by design (a different,
   also-standard NMS/threshold convention); this is a known, measured,
   and documented difference, not an unverified assumption.
-\item HOG, ResNet, and the Levina-Bickel/TwoNN citations listed in
-  the project brief should be independently verified by the author before use in
-  any application, per the project's own instructions.
 \end{itemize}
 
 \section*{Reproducibility}

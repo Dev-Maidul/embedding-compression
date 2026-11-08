@@ -1,5 +1,7 @@
 # How much can image features be compressed?
 
+_Created: November 2026_
+
 A small, honest, reproducible study: from-scratch image/signal processing
 (validated against OpenCV), classic and learned CIFAR-10 features, and one
 research question about how much nearest-neighbour retrieval quality is
@@ -7,26 +9,41 @@ lost when features are compressed by random projection, and whether that
 loss can be predicted from intrinsic dimension. This is a small empirical
 study, not a state-of-the-art or novel method.
 
-Full project brief and rules are kept in a private planning document, not included in this repository.
+## Overview
 
-## Setup
+The question: when an image feature vector is compressed from its full
+dimension $d$ down to $m$ dimensions by a random projection, how much
+nearest-neighbour retrieval quality is lost, and can that loss be
+predicted ahead of time from the feature's intrinsic dimension (how many
+real degrees of freedom the data varies along, as opposed to how many
+numbers it happens to be stored with)? The study is split into three
+parts: foundational image/signal processing implemented from scratch and
+validated against OpenCV, three feature types extracted for CIFAR-10, and
+the random-projection retrieval experiment itself together with intrinsic
+dimension estimation.
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+## What is implemented
 
-## Run everything
-
-```bash
-./run_all.sh
-```
-
-This recreates the venv, runs all tests, writes `results/environment.txt`,
-and regenerates every CSV/figure in `results/` from scratch. Nothing in
-this README or the report is typed by hand; every number is produced by a
-script reading from `results/`.
+- **Part A -- image and signal processing, from scratch in NumPy**:
+  2D convolution/correlation, Gaussian blur, Sobel gradients, Canny edge
+  detection (non-maximum suppression and double-threshold hysteresis),
+  histogram equalization, and FFT-domain low/high-pass filtering. Every
+  function is validated against OpenCV (and, for the convolution theorem,
+  against a direct FFT-domain computation) with measured error numbers in
+  `results/a_validation.csv`, not just visual inspection.
+- **Part B -- features on the CIFAR-10 test set (10,000 images)**: raw
+  pixels (3072-d, globally normalized), HOG (324-d, scikit-image), and
+  pretrained ResNet-18 penultimate-layer features (512-d). The ResNet-18
+  input resolution (224px) was chosen after benchmarking 32/64/224px
+  first, not assumed (`results/b_resnet_resolution_benchmark.csv`).
+- **Part C -- random projection, retrieval, and intrinsic dimension**:
+  three random projections (dense Gaussian, sparse Achlioptas, and a
+  structured Subsampled Randomized Hadamard Transform), each measured for
+  recall@10 against exact nearest-neighbour ground truth across a grid of
+  projection dimensions and 10 seeds with bootstrap confidence intervals;
+  and intrinsic dimension estimated with TwoNN and the Levina-Bickel MLE,
+  both validated on synthetic data of known dimension before use on real
+  features.
 
 <!-- RESULTS_SUMMARY_START -->
 
@@ -75,10 +92,87 @@ _Regenerated from `results/*.csv` by `report/make_readme_summary.py` -- not hand
 
 <!-- RESULTS_SUMMARY_END -->
 
-## Exact run commands
+## Findings
 
-Each stage can also be run individually (all assume `source venv/bin/activate`
-and running from the repo root):
+**Recall vs. projection dimension.** At a representative projection
+dimension of $m=64$, recall@10 ranges from about 0.20 (HOG) to about 0.38
+(raw pixels), with ResNet features in between at about 0.30 (exact means
+and 95% CIs for every (feature, projection) pair are in the Results
+summary above and `results/c_recall.csv`). All three projection methods
+(Gaussian, sparse, SRHT) give nearly identical recall for pixels and HOG.
+
+**SRHT vs. Gaussian/sparse on ResNet features at large $m$.** For ResNet
+features at $m=256$ (the largest projection dimension tested here, since
+only $m<d$ was run), SRHT reaches recall@10 $\approx$ 0.685 versus
+$\approx$ 0.582 for Gaussian/sparse projection -- a difference clearly
+outside the reported confidence intervals. We do not have an established
+explanation for this. One untested hypothesis: SRHT samples coordinates
+without replacement from a fixed orthogonal transform, which could reduce
+variance relative to Gaussian/sparse projection when $m/D$ is large; this
+is speculation, not something this study tested or confirmed.
+
+**Intrinsic dimension and the collapse hypothesis.** TwoNN-estimated
+intrinsic dimension is 31.6 for pixels, 40.0 for HOG, and 30.1 for ResNet
+features. The central hypothesis -- that recall@10 at fixed $m$ depends
+mainly on intrinsic dimension, so that recall curves for different
+feature types should collapse onto one curve when plotted against
+$m/\hat{ID}$ rather than raw $m$ -- gets only weak, preliminary support
+from this data. Pixels and ResNet features have almost the same
+estimated intrinsic dimension (31.6 vs. 30.1) but noticeably different
+recall at $m=64$ (0.378 vs. 0.297), which the hypothesis alone does not
+explain. A pre-declared spread statistic is lower for $m/\hat{ID}$
+(0.031) than for raw $m$ (0.043), but only slightly, and largely because
+the three feature types' TwoNN estimates (31.6, 40.0, 30.1) are
+themselves fairly close together -- so there is limited dynamic range for
+$m/\hat{ID}$ to actually differ from $m$ across feature types. This
+result rests on only three curves (one per feature type) with no
+uncertainty estimate on the spread statistic itself, so it should be read
+as a preliminary, exploratory observation, not a confirmed effect.
+
+## Limitations
+
+- Single dataset (CIFAR-10), a fixed 10,000-image subset, one random
+  seed for data splits.
+- CPU-only, which bounded some choices (e.g. ResNet-18 instead of a
+  larger backbone) but was not otherwise a binding constraint -- every
+  experiment here, including the slowest (about 18.5 minutes), finished
+  well within an hour.
+- The collapse analysis above uses only feature-type-level recall curves
+  (three points), not separate recall sweeps for each of the 10 CIFAR-10
+  classes, since the per-class version would cost roughly 10x the
+  runtime of the feature-type-level sweep. Per-class intrinsic dimension
+  estimates (30 (feature, class) combinations) were still computed in
+  full and are in `results/c_intrinsic_dim.csv`.
+- The intrinsic-dimension/collapse hypothesis is exploratory and
+  received only weak, preliminary support (see Findings above), not
+  confirmation. The accompanying Spearman correlation check uses only
+  $n=3$ data points and is not statistically meaningful at that sample
+  size.
+- Canny does not pixel-match OpenCV's `cv2.Canny` exactly, by design (a
+  different, also-standard non-maximum-suppression and threshold
+  convention); this is a measured, documented difference
+  (`results/a_validation.csv`), not an unverified assumption.
+- The 10-d hypercube intrinsic-dimension validation case underestimates
+  the true dimension (TwoNN 8.75, MLE 8.38, vs. true 10), a known
+  boundary-bias effect for bounded distributions documented in
+  `docs/DECISIONS.md`, not a bug in the estimators.
+
+## Reproducing
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+./run_all.sh
+```
+
+`run_all.sh` recreates the venv, downloads CIFAR-10 if needed, runs all
+tests, and regenerates every CSV, figure, and report table in `results/`
+and `report/` from scratch. Nothing in this README or the report is typed
+by hand; every number is produced by a script reading from `results/`.
+
+Each stage can also be run individually (all assume
+`source venv/bin/activate` and running from the repo root):
 
 ```bash
 python experiments/make_environment_txt.py        # results/environment.txt
@@ -95,99 +189,33 @@ python experiments/c_collapse_analysis.py             # results/c_collapse.csv +
 python report/make_tables.py                          # report/tables/*.tex
 python report/make_readme_summary.py                  # regenerates the section above
 cd report && pdflatex report.tex && pdflatex report.tex && cd ..
-pytest tests/ -q                                      # all unit tests
+pytest tests/ -q                                      # all unit tests (75 passing)
 ```
 
-## Status
+Seed 42 is used everywhere a seed applies. Machine and package versions
+are recorded in `results/environment.txt` (generated by
+`experiments/make_environment_txt.py`); all experiments were run
+CPU-only.
 
-- **Day 1 (done):** repo/venv/config set up, CIFAR-10 test set downloaded,
-  2D convolution/correlation, Gaussian blur, Sobel gradients implemented
-  from scratch in NumPy, all with pytest tests, and validated against
-  OpenCV in `results/a_validation.csv` (max abs error ~1e-13, essentially
-  floating-point noise; Sobel matches exactly). See
-  `docs/DECISIONS.md` and `docs/EXPLAINERS.md` for what was decided and why.
-- **Day 2 (done):** Canny edge detector (NMS + hysteresis), histogram
-  equalization, and FFT low/high-pass filtering implemented from scratch,
-  all with pytest tests. Histogram equalization matches `cv2.equalizeHist`
-  exactly; Canny agrees with `cv2.Canny` on 93-99% of pixels (different,
-  both-valid NMS/threshold conventions, see `docs/DECISIONS.md`); the
-  convolution theorem is confirmed numerically (max abs error ~1e-13,
-  `results/a_fourier_timing.csv`) with a timing plot showing FFT-based
-  convolution's cost staying flat as kernel size grows while spatial
-  convolution's grows with it. Three figures in `results/figures/`:
-  `canny_edges.png`, `histogram_equalization.png`, `frequency_filtering.png`.
-- **Day 3 (done):** raw pixel (3072-d), HOG (324-d), and pretrained
-  ResNet-18 penultimate (512-d) features extracted and cached as `.npy`
-  for all 10,000 CIFAR-10 test images (`data/features/`, gitignored).
-  ResNet input resolution benchmarked first at 32/64/224px
-  (`results/b_resnet_resolution_benchmark.csv`): all three are well under
-  20 minutes for the full set (0.9 / 0.9 / 3.6 min), so we use 224px (the
-  resolution ResNet-18 was actually trained on) rather than trading
-  quality for unneeded speed. Measured extraction time for all 10,000
-  images (`results/b_feature_extraction.csv`): pixels <0.1s, HOG 1.2s,
-  ResNet-18 213s (~3.6 min). See `docs/DECISIONS.md`.
-- **Day 4 (done):** three random projections implemented from scratch
-  (dense Gaussian, sparse Achlioptas, structured SRHT via a hand-written
-  Fast Walsh-Hadamard Transform), all norm-preserving in expectation and
-  tested for distance preservation. Ran the full recall@10 sweep: 3
-  feature types x 3 projections x up to 7 projection dimensions (m in
-  {4,...,256}, m<d only) x 10 seeds = 63 settings, each with a 95%
-  bootstrap CI over the pooled 100,000 (seed, query) recall values
-  (`results/c_recall.csv`). Took 18.5 minutes on this machine (estimated
-  ~15 min beforehand from a subset benchmark; ran in the background with
-  progress logged to `results/c_recall_progress.log` -- see
-  `docs/DECISIONS.md` for why the estimate undershot a bit). One
-  recall-vs-m plot per feature type in `results/figures/` (e.g. for
-  ResNet features at m=256/512, SRHT reaches recall@10 ≈ 0.69 vs ≈ 0.58
-  for Gaussian/sparse -- the three projections track each other closely
-  for pixels and HOG but SRHT noticeably outperforms at large m/d for
-  ResNet features; not yet explained, a candidate thing to look at in
-  Part C's intrinsic-dimension analysis).
-- **Day 5 (done):** TwoNN (Facco et al., 2017) and Levina-Bickel MLE
-  intrinsic-dimension estimators implemented from scratch and validated on
-  synthetic data with known dimension before trusting them on real
-  features (`results/c_id_validation.csv`): a 5-d subspace embedded in
-  100-d is recovered almost exactly (TwoNN 5.00, MLE 5.03); a 10-d
-  hypercube is underestimated (~8.4-8.75), a known, documented boundary
-  effect, not a bug (`docs/DECISIONS.md`). Estimated ID for all 3 feature
-  types and, as a second level, each of the 10 CIFAR-10 classes
-  separately (30 (feature, class) points, `results/c_intrinsic_dim.csv`).
-  Tested the central hypothesis -- does recall@10 vs m/ID_hat collapse
-  feature types onto one curve? A pre-declared spread statistic says
-  m/ID_hat (0.031) collapses curves better than raw m (0.043) and much
-  better than m/d (0.190), real measured support for the hypothesis, but
-  the collapse is partial, not clean (`results/figures/c_collapse_vs_m_over_id.png`).
-  **Scope note, recorded honestly:** the collapse check uses only the 3
-  feature-type curves, not separate recall sweeps for each of the 10
-  classes (that would have multiplied Day 4's ~18.5-minute runtime
-  roughly 10x); per-class *ID estimates* are still reported in full. The
-  Spearman correlation (ID_hat vs recall-loss) uses only n=3 points and is
-  flagged as statistically uninformative at that size, not hidden.
-- **Day 6 (done):** `report/report.tex` written (Question, Methods, Results,
-  Limitations, Reproducibility) with every table generated from
-  `results/*.csv` by `report/make_tables.py` -- nothing typed by hand.
-  Installing `pdflatex` (BasicTeX) needed `sudo`, so per the project brief's rule
-  against touching anything outside the project folder without
-  permission, we asked first and the owner ran the install himself.
-  Compiles twice without errors, 3 pages (within the 2-3 page budget
-  after tightening formatting). This README's "Results summary" section
-  is now regenerated by `report/make_readme_summary.py` (between HTML
-  comment markers) instead of being hand-edited.
-- **Day 7 (done, technical part):** fresh-clone verification -- cloned the
-  committed git history into a separate directory and ran `./run_all.sh`
-  from scratch (new venv, re-downloaded CIFAR-10, re-ran every
-  experiment, recompiled the report). Every seeded, scientifically
-  meaningful number matched the committed results bit-for-bit (recall@10,
-  intrinsic dimension estimates, the collapse statistic, Part A error
-  metrics, feature shapes); only unseeded wall-clock timing numbers
-  differed, as expected. All 75 tests passed in the fresh clone too. See
-  `docs/DECISIONS.md` for the full comparison. **Remaining (owner-driven,
-  not something this session can do alone):** the owner explaining the
-  full project aloud in 5 minutes for a weakest-points review, and
-  answering the interview questions in `docs/INTERVIEW_QA.md`.
+## Repository layout
 
-## Repro notes
+```
+src/
+  ip/          convolution, Gaussian, Sobel, Canny, histogram eq, Fourier
+  features/    pixel, HOG, ResNet-18 feature extraction, CIFAR-10 loading
+  projection/  Gaussian, sparse (Achlioptas), and SRHT random projections
+  eval/        exact kNN recall, bootstrap CI, intrinsic dimension (TwoNN/MLE)
+experiments/   one script per experiment, producing files in results/
+tests/         pytest unit tests for every src/ module
+results/       CSVs, figures, environment.txt (committed; regenerated by run_all.sh)
+report/        report.tex, make_tables.py, make_readme_summary.py, tables/
+docs/          DECISIONS.md (every parameter choice and why), EXPLAINERS.md
+configs/       default.yaml (seeds, grids, paths)
+data/          CIFAR-10 and cached features (gitignored, regenerated locally)
+```
 
-- Seed: 42, everywhere.
-- Machine: see `results/environment.txt` (generated by
-  `experiments/make_environment_txt.py`), CPU only.
+## Development note
+
+Parts of the code and documentation were written with an AI coding
+assistant (Claude Code). The author defined the study, reviewed the
+code, ran the experiments and is responsible for the results.
