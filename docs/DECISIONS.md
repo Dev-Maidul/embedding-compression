@@ -1,9 +1,9 @@
 # Decisions log
 
-Every time a parameter or design choice is not fixed by the project brief, it is
+Every time a parameter or design choice is not fixed by the study design, it is
 recorded here with the reason, instead of silently picking something.
 
-## Day 1
+## Image processing
 
 - **Convolution implementation: vectorized with `np.lib.stride_tricks.sliding_window_view` + `einsum`, not a raw double Python for-loop.**
   Reason: a pure double-loop over every pixel is correct but far too slow
@@ -30,7 +30,7 @@ recorded here with the reason, instead of silently picking something.
 
 - **Validation images: `skimage.data` samples (camera, astronaut converted
   to gray, checkerboard, coins)**, not CIFAR-10, for Part A. Reason: these
-  are the images the project brief names as needing "no download", and they are
+  are the images the study design calls for as needing "no download", and they are
   large and varied enough (200x200 to 512x512) to stress-test correctness
   and timing; CIFAR-10 images (32x32) are reserved for Part B/C feature
   extraction and retrieval, where their small size is the point.
@@ -40,8 +40,6 @@ recorded here with the reason, instead of silently picking something.
   informational only; no experiment size was scaled up because of it —
   all sizes (10k retrieval set, feature dims, etc.) stay as originally
   planned.
-
-## Day 2
 
 - **Canny NMS uses 4-sector angle quantization (0/45/90/135 degrees), not
   continuous bilinear interpolation between neighbours.**
@@ -70,7 +68,7 @@ recorded here with the reason, instead of silently picking something.
   operation and using it keeps the code about what Canny does
   ("keep a weak pixel iff its connected component contains a strong
   pixel"), not about reimplementing graph traversal from scratch, which
-  the project brief does not ask for.
+  is outside this study's scope.
 
 - **Frequency filters use an ideal (hard circular cutoff) mask**, not a
   smoothed one (e.g. Gaussian or Butterworth). Reason: this is the
@@ -88,7 +86,7 @@ recorded here with the reason, instead of silently picking something.
   expected mismatch at the border that has nothing to do with a bug —
   using `wrap` isolates the comparison to exactly what the theorem claims.
 
-## Day 3
+## Features
 
 - **Raw pixel features use global normalization (divide every pixel by
   255.0, same scale for every image), not per-image normalization
@@ -112,8 +110,8 @@ recorded here with the reason, instead of silently picking something.
   Reason: measured first, not guessed (`results/b_resnet_resolution_benchmark.csv`,
   on a 500-image subset): extracting all 10,000 images takes about 0.9 min
   at 32px, 0.9 min at 64px, and 3.6 min at 224px on this CPU-only machine
-  -- all comfortably under the 20-minute "say so first" threshold in
-  the project brief. Since the time cost of 224px is small in absolute terms, we
+  -- all comfortably under the 20-minute "say so first" threshold set
+  for long-running experiments. Since the time cost of 224px is small in absolute terms, we
   use it despite being the slowest option, because 224x224 is the
   resolution ImageNet-pretrained ResNet-18 was actually trained on; its
   early convolutional layers expect that much spatial detail, so feeding
@@ -132,7 +130,7 @@ recorded here with the reason, instead of silently picking something.
   network's expected input size and avoids the blocky artifacts nearest-
   neighbour would introduce.
 
-## Day 4
+## Projection and retrieval
 
 - **All three projections are scaled to be norm-preserving in
   expectation: E[||Rx||^2] = ||x||^2.** Dense Gaussian entries have
@@ -166,7 +164,7 @@ recorded here with the reason, instead of silently picking something.
 
 - **Bootstrap CI is computed over the pooled (10 seeds x 10,000 queries)
   array of per-query recall values, not over per-seed mean recalls, and
-  not per-seed separately.** the project brief asks for "the mean over seeds and
+  not per-seed separately.** The study design calls for "the mean over seeds and
   a 95% bootstrap CI over queries". We pool every (seed, query) recall
   value into one array before resampling, so the reported mean equals the
   average of the 10 per-seed means (every seed contributes equally many
@@ -180,8 +178,8 @@ recorded here with the reason, instead of silently picking something.
   means would.
 
 - **Full sweep timing was measured on real feature data before running
-  the whole experiment**, per the project brief's ">20 minutes, say so and run in
-  background" rule: ground-truth top-10 on the full 3072-d pixel features
+  the whole experiment**, following the ">20 minutes, say so and run in
+  background" rule for long experiments: ground-truth top-10 on the full 3072-d pixel features
   took ~5s, a single projected top-10 computation (any m from 4 to 256)
   took ~1-1.5s (dominated by the fixed O(N^2) pairwise-distance cost, not
   by m), and the full sweep (3 features x 3 projections x up to 7 valid m
@@ -194,24 +192,24 @@ recorded here with the reason, instead of silently picking something.
   m=4 vs ~17-19s at m=256, since larger-m projections and their
   Hadamard/matrix-multiply steps cost a little more) in a way the small
   benchmark at only two m values (4 and 256, not all 7) underestimated.
-  Recorded here rather than silently adjusted, per the project brief's honesty
-  rule about not shrinking or hand-waving timing numbers.
+  Recorded here rather than silently adjusted, following this study's
+  honesty rule about not shrinking or hand-waving timing numbers.
 
-## Day 5
+## Intrinsic dimension and collapse analysis
 
 - **Collapse analysis uses only the 3 feature-type-level recall curves,
   NOT separate recall@10 sweeps for each of the 10 classes.** This is a
-  deliberate, acknowledged scope reduction from the project brief's wording ("recall
+  deliberate, acknowledged scope reduction from the original study design ("recall
   curves for different feature types and classes should collapse"),
-  recorded here as the rule requires. Reason: running the full
+  recorded here as this log's own rule requires. Reason: running the full
   recall@10 sweep (3 projections x 7 m values x 10 seeds) separately for
   each of the 10 classes, on top of the 3 feature types already done,
-  would multiply Day 4's measured 18.5-minute runtime by roughly 10x
+  would multiply the projection-and-retrieval sweep's measured 18.5-minute runtime by roughly 10x
   (each class subset is smaller, ~1000 points vs 10,000, so the per-run
   cost is less than 10x, but still a large, multi-hour addition) for a
   7-day project with many other things still to build. ID estimation
   itself *is* done at the per-class level (30 (feature, class) points,
-  `results/c_intrinsic_dim.csv`) exactly as the project brief specifies, so the
+  `results/c_intrinsic_dim.csv`) exactly as planned, so the
   per-class ID numbers exist and are reported; what's reduced is only the
   per-class *recall curve* half of the collapse check. This is stated
   explicitly in the report limitations, not silently dropped.
@@ -237,8 +235,8 @@ recorded here with the reason, instead of silently picking something.
   and both the TwoNN and Levina-Bickel papers note exactly this bias for
   bounded, non-smooth-boundary distributions like a hypercube. Reported
   honestly in `results/c_id_validation.csv` and the report rather than
-  tuned away, per the project brief's rule against ever adjusting a method to
-  make a number look better.
+  tuned away, following this study's rule against ever adjusting a method
+  to make a number look better.
 
 - **Collapse curves average recall@10 over the 3 projection methods at
   each m**, rather than keeping 9 separate (feature x projection)
@@ -247,7 +245,7 @@ recorded here with the reason, instead of silently picking something.
   in projection-method variation would make the 3 "feature curves" noisier
   for no reason relevant to the hypothesis being tested. The separate,
   per-projection recall differences (e.g. SRHT's edge on ResNet features,
-  noted in Day 4) are a different question, already reported in
+  noted in the projection-and-retrieval sweep) are a different question, already reported in
   `results/c_recall.csv` and `results/figures/c_recall_vs_m_*.png`.
 
 - **Collapse statistic (pre-declared before looking at the result): for
@@ -274,9 +272,9 @@ recorded here with the reason, instead of silently picking something.
   uninformative at this sample size -- a correlation computed from 3
   points can only take a handful of possible values and its p-value
   cannot be small no matter what the data looks like. Included for
-  completeness since the project brief asks for it, not presented as evidence.
+  completeness since the study design calls for it, not presented as evidence.
 
-## Day 6
+## Report and verification
 
 - **`pdflatex` was not installed on the development machine.** A minimal
   LaTeX distribution (BasicTeX, via Homebrew) was installed to compile
@@ -289,7 +287,7 @@ recorded here with the reason, instead of silently picking something.
   script (`report/make_readme_summary.py`) that only rewrites the text
   between two HTML comment markers**, leaving the rest of the README
   (narrative Day-by-day status log, setup instructions) untouched.
-  Reason: the project brief's rule #1 ("every number in the README and report
+  Reason: this study's rule #1 ("every number in the README and report
   must be produced by a script... not typed by hand") applies most
   strictly to numbers presented as results; the Day-by-day status log is
   narrative commentary written as each day's work finished, and its
@@ -303,13 +301,11 @@ recorded here with the reason, instead of silently picking something.
 - **Report tables are kept deliberately short** (e.g. the per-class
   intrinsic-dimension table, 30 rows, is generated as a .tex fragment by
   `make_tables.py` but NOT `\input` into the 2-3 page `report.tex` body --
-  only the 3-row feature-type-level summary is). Reason: the project brief asks
-  for a 2-3 page report; a 30-row table would not fit that budget. The
+  only the 3-row feature-type-level summary is). Reason: the study design
+  calls for a 2-3 page report; a 30-row table would not fit that budget. The
   full per-class numbers are still fully generated, still in
   `results/c_intrinsic_dim.csv`, and the report text explicitly points
   there -- nothing is hidden, just not inlined into the short report.
-
-## Day 7
 
 - **Fresh-clone verification: cloned the committed git history into a
   separate scratch directory, ran `./run_all.sh` there from scratch**
@@ -325,7 +321,7 @@ recorded here with the reason, instead of silently picking something.
   The only numbers that differed between runs were wall-clock timing
   measurements (e.g. `elapsed_sec`, `time_ours_sec`), which are not
   seeded and depend on machine load -- exactly the kind of difference
-  the project brief's "match within seeds' tolerance" allows, not a reproducibility
+  the "match within seeds' tolerance" standard allows, not a reproducibility
   failure. All 75 pytest tests passed in the fresh clone too. The
   verification clone was deleted afterward (it is not part of the
   project folder and was only ever scratch space for this check).
