@@ -11,3 +11,4 @@ report/*.out
 report/*.pdf
 CLAUDE.md
 START_PROMPT.md
+docs/INTERVIEW_QA.md
