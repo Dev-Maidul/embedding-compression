@@ -12,3 +12,5 @@ report/*.pdf
 CLAUDE.md
 START_PROMPT.md
 docs/INTERVIEW_QA.md
+config.bat
+node_modules

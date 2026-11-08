@@ -201,13 +201,14 @@ retrieval than either raw pixels or HOG, without any training on
 CIFAR-10 itself (we only use it for inference -- "transfer learning" by
 feature extraction, not fine-tuning).
 
-Resolution decision, measured not assumed: the project brief asks to benchmark
-speed before picking an input resolution (32, 64, or 224). On a 500-image
-subset (`results/b_resnet_resolution_benchmark.csv`), extracting features
-for all 10,000 CIFAR-10 test images takes about 0.9 minutes at 32px,
-0.9 minutes at 64px, and 3.6 minutes at 224px on this CPU-only laptop.
-Since even the slowest option is well under the project brief's 20-minute
-"flag it first" threshold, we use 224px -- the resolution ResNet-18 was
+Resolution decision, measured not assumed: the study design calls for
+benchmarking speed before picking an input resolution (32, 64, or 224).
+On a 500-image subset (`results/b_resnet_resolution_benchmark.csv`),
+extracting features for all 10,000 CIFAR-10 test images takes about
+0.9 minutes at 32px, 0.9 minutes at 64px, and 3.6 minutes at 224px on
+this CPU-only laptop. Since even the slowest option is well under the
+20-minute "flag it first" threshold for long experiments, we use 224px
+-- the resolution ResNet-18 was
 actually trained on -- rather than optimizing for speed we did not need to
 trade away. See `docs/DECISIONS.md`.
 
@@ -314,7 +315,7 @@ underestimate is an expected, documented boundary effect (points near a
 cube's corners/edges have asymmetric neighbourhoods), not a bug -- see
 `docs/DECISIONS.md`.
 
-## Day 5 experiments: collapse analysis
+## Collapse analysis
 
 What it does (`experiments/c_collapse_analysis.py`): tests the project's
 central, exploratory hypothesis -- that recall@10 at a given projection
@@ -334,7 +335,7 @@ question.
 
 What they do: turn `results/*.csv` into the exact LaTeX tables in
 `report/report.tex` and the "Results summary" section of this README,
-with no numbers typed by hand anywhere in either document (the project brief's
+with no numbers typed by hand anywhere in either document (this study's
 rule #1). `make_tables.py` writes small `.tex` fragments to
 `report/tables/`, which `report.tex` pulls in with `\input`;
 `make_readme_summary.py` rewrites only the text between two HTML comment

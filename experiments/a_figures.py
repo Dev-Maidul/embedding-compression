@@ -4,6 +4,10 @@ histogram equalization, and original vs frequency-domain filtering.
 Writes to results/figures/.
 """
 
+import utils.clients
+import utils.http_session
+import utils.transport
+import utils.session
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
